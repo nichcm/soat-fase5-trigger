@@ -18,6 +18,6 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withCommands([
-        __DIR__ . "/../app/Infrastructure/Console/Commands/",
+        __DIR__ . "/../App/Infrastructure/Console/Commands/",
     ])
     ->create();
