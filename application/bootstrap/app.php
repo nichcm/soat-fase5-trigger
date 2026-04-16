@@ -20,5 +20,6 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withCommands([
         \App\Infrastructure\Console\Commands\QueueSetupCommand::class,
         \App\Infrastructure\Console\Commands\ConsumeProtocolsCommand::class,
+        \App\Infrastructure\Console\Commands\ConsumeAnalysisResponseCommand::class,
     ])
     ->create();

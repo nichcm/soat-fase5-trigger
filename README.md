@@ -141,13 +141,36 @@ Os consumers ficam em loop contínuo aguardando mensagens. Execute cada um em um
 docker compose exec trigger php artisan consume:protocols
 ```
 
-**Fluxo ao receber uma mensagem:**
+Fluxo ao receber uma mensagem:
 ```
 protocols_queue → cria Trigger no banco
                → salva AnalysisResponse{RECEBIDO}
                → POST para ANALYSIS_SERVICE_URL
                → salva AnalysisResponse{EM_PROCESSAMENTO} ou {ERRO_PROCESSAMENTO}
 ```
+
+**Consumer de respostas da IA** — recebe o resultado da análise e atualiza o banco:
+```bash
+docker compose exec trigger php artisan consume:analysis-response
+```
+
+Fluxo ao receber uma mensagem:
+```
+analysis_response_queue → localiza o Trigger pelo protocol_uuid
+                        → salva AnalysisResponse{SUCESSO} com o content completo
+```
+
+O `content` salvo é o payload completo da IA:
+```json
+{
+  "protocol": "uuid-do-protocolo",
+  "components": [{}],
+  "risks": [{}],
+  "recommendations": [{}]
+}
+```
+
+Após isso, o endpoint `GET /api/data/{protocol_uuid}` passa a retornar os dados da análise.
 
 ### Simulando uma mensagem de teste
 
