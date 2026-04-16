@@ -42,15 +42,6 @@ class RabbitMQ
         );
     }
 
-    // public function __destruct()
-    // {
-    //     logger()->info("RabbitMQ Message Broker stopped.", []);
-
-    //     if ($this->connection) {
-    //         $this->connection->close();
-    //     }
-    // }
-
     public function createChannel()
     {
         if (! $this->connection || ! $this->connection?->isConnected()) {
@@ -82,108 +73,98 @@ class RabbitMQ
     {
         $channel = $this->createChannel();
 
-        $channel->exchange_declare("uploads_exchange", "direct", false, true, false);
-        $channel->exchange_declare("uploads_dlx_exchange", "direct", false, true, false); // DLX (Dead Letter Exchange) para mensagens que não puderem ser processadas
-
-        // Fila principal com DLQ configurada:
-        $channel->queue_declare(
-            "uploads_queue",
-            false, // passive: se true, verifica se a fila existe sem criá-la. Se a fila não existir, lança uma exceção. Se false, cria a fila se ela não existir.
-            true, // durable: se true, a fila sobreviverá a reinicializações do RabbitMQ. As mensagens também devem ser marcadas como persistentes para garantir que não sejam perdidas.
-            false, // exclusive: se true, a fila só pode ser usada pela conexão que a declarou e será excluída quando a conexão fechar. Se false, a fila pode ser compartilhada entre conexões.
-            false, // auto_delete: se true, a fila será excluída automaticamente quando não houver mais consumidores. Se false, a fila permanecerá mesmo sem consumidores.
-            false, // nowait: se true, o servidor não enviará uma resposta ao cliente. O cliente não receberá confirmação de que a fila foi declarada com sucesso. Se false, o cliente aguardará uma resposta do servidor.
-            new AMQPTable(
-                [
-                    "x-dead-letter-exchange"    => "uploads_dlx_exchange", // Especifica a DLX para onde as mensagens serão enviadas se não puderem ser processadas (ex: após várias tentativas de consumo falharem).
-                    "x-dead-letter-routing-key" => "uploads_dlq_routing_key", // Especifica a routing key para as mensagens na DLX, permitindo roteá-las para uma fila específica de DLQ.
-                    "x-message-ttl"             => 5000, // Tempo de vida das mensagens na fila em milissegundos. Após esse tempo, as mensagens expiram e são movidas para a DLX (se configurada) ou descartadas.
-                ]
-            ), // arguments: um array associativo de argumentos adicionais para a fila. Por exemplo, para configurar uma DLQ, você pode usar:
-        );
+        // --- Fila de protocolos (publicada pelo upload-ms, consumida aqui) ---
+        $channel->exchange_declare("protocols_exchange",     "direct", false, true, false);
+        $channel->exchange_declare("protocols_dlx_exchange", "direct", false, true, false);
 
         $channel->queue_declare(
-            "uploads_dlq_queue",
-            false,
-            true,
-            false,
-            false,
-        );
-
-        $channel->queue_bind(
-            "uploads_queue",
-            "uploads_exchange",
-            "uploads_routing_key",
-        );
-
-        $channel->queue_bind(
-            "uploads_dlq_queue",
-            "uploads_dlx_exchange",
-            "uploads_dlq_routing_key",
-        );
-
-        if ($channel) {
-            $channel->close();
-        }
-    }
-
-    public function publishUpload(array $messagePayload): bool
-    {
-        if (sizeof($messagePayload) === 0) return false;
-
-        $channel = $this->createChannel();
-
-        $channel->basic_publish(
-            msg: new AMQPMessage(json_encode($messagePayload), [
-                'content_type'  => 'application/json',
-                'delivery_mode' => AMQPMessage::DELIVERY_MODE_PERSISTENT, // ! IMPORTANTE: persiste no disco
+            "protocols_queue",
+            false, true, false, false, false,
+            new AMQPTable([
+                "x-dead-letter-exchange"    => "protocols_dlx_exchange",
+                "x-dead-letter-routing-key" => "protocols_dlq_routing_key",
+                "x-message-ttl"             => 5000,
             ]),
-
-            exchange: "uploads_exchange",
-
-            routing_key: "uploads_routing_key", // o routing_key deve ser o nome da fila para onde a mensagem vai diretamente.
-
-            mandatory: false, // Se true, exige que a mensagem seja roteada para pelo menos uma fila. Caso contrário, o RabbitMQ retorna a mensagem ao publicador via basic.return
-            // false (padrão): se a mensagem não puder ser roteada, ela é descartada silenciosamente.
-            // true: se nenhuma fila receber a mensagem, ela é devolvida ao publicador, que deve tratar o retorno (ex: log, re-publicação).
-            // Útil para garantir que a mensagem não seja perdida por erro de roteamento.
-
-            immediate: false, // exige que a mensagem seja entregue imediatamente a um consumidor. Se não houver consumidor pronto, a mensagem é retornada.
-            // Este parâmetro é obsoleto no RabbitMQ (removido na versão 3.0+). Definir como true geralmente resulta em erro ou é ignorado.
-            // Manter como false.
-
-            ticket: null // Usado em versões antigas do RabbitMQ com ACL (Access Control Lists). Representa um ticket de autenticação.
-            // Em versões recentes do RabbitMQ e da biblioteca, esse parâmetro não é mais utilizado. Deixar como null.
         );
 
-        if ($channel) {
-            $channel->close();
-        }
+        $channel->queue_declare("protocols_dlq_queue", false, true, false, false);
 
-        return true;
+        $channel->queue_bind("protocols_queue",     "protocols_exchange",     "protocols_routing_key");
+        $channel->queue_bind("protocols_dlq_queue", "protocols_dlx_exchange", "protocols_dlq_routing_key");
+
+        // --- Fila de respostas de análise (publicada pela IA, consumida aqui) ---
+        $channel->exchange_declare("analysis_response_exchange",     "direct", false, true, false);
+        $channel->exchange_declare("analysis_response_dlx_exchange", "direct", false, true, false);
+
+        $channel->queue_declare(
+            "analysis_response_queue",
+            false, true, false, false, false,
+            new AMQPTable([
+                "x-dead-letter-exchange"    => "analysis_response_dlx_exchange",
+                "x-dead-letter-routing-key" => "analysis_response_dlq_routing_key",
+                "x-message-ttl"             => 5000,
+            ]),
+        );
+
+        $channel->queue_declare("analysis_response_dlq_queue", false, true, false, false);
+
+        $channel->queue_bind("analysis_response_queue",     "analysis_response_exchange",     "analysis_response_routing_key");
+        $channel->queue_bind("analysis_response_dlq_queue", "analysis_response_dlx_exchange", "analysis_response_dlq_routing_key");
+
+        $channel->close();
+
+        logger()->info("RabbitMQ setup concluído: exchanges, filas e bindings criados.");
     }
 
-    public function consumeUploads(callable $callback): void
+    public function consumeProtocols(callable $callback): void
     {
         $channel = $this->createChannel();
 
         $channel->basic_consume(
-            queue: "uploads_queue",
+            queue:        "protocols_queue",
             consumer_tag: "",
-            no_local: false, // Se true, o consumidor não receberá mensagens publicadas pela mesma conexão. Se false, o consumidor pode receber mensagens publicadas pela mesma conexão. Útil para evitar que um produtor consuma suas próprias mensagens.
-            no_ack: false, // ! IMPORTANTE: desabilita o auto-ack para garantir que as mensagens sejam processadas com segurança. O consumidor deve enviar manualmente um ack após processar a mensagem.
-            exclusive: false, // Se true, a fila só pode ser consumida por esta conexão e será fechada quando a conexão for encerrada. Se false, a fila pode ser consumida por várias conexões.
-            nowait: false, // Se true, o servidor não enviará uma resposta ao cliente. O cliente não receberá confirmação de que o consumidor foi registrado com sucesso. Se false, o cliente aguardará uma resposta do servidor.
-            callback: function (AMQPMessage $message) use ($callback, &$channel) {
+            no_local:     false,
+            no_ack:       false,
+            exclusive:    false,
+            nowait:       false,
+            callback:     function (AMQPMessage $message) use ($callback, &$channel) {
                 try {
-                    // $payload = json_decode($message->getBody(), true);
                     $callback($message, $channel);
-                    // $message->ack(); // Envia um ack (acknowledgement, ou seja, confirmação) manual após o processamento bem-sucedido da mensagem.
                 } catch (Throwable $e) {
-                    logger()->error("Erro ao processar mensagem do RabbitMQ", ['err' => $e->getMessage(), 'message_body' => $message->getBody()]);
-                    // Se ocorrer um erro, não enviamos o ack, permitindo que a mensagem seja reentregue ou encaminhada para a DLQ após várias tentativas falharem.
+                    logger()->error("Erro ao processar mensagem de protocols.", [
+                        'err'  => $e->getMessage(),
+                        'body' => $message->getBody(),
+                    ]);
                 }
-            }
+            },
+        );
+
+        while ($channel->is_consuming()) {
+            $channel->wait();
+        }
+    }
+
+    public function consumeAnalysisResponse(callable $callback): void
+    {
+        $channel = $this->createChannel();
+
+        $channel->basic_consume(
+            queue:        "analysis_response_queue",
+            consumer_tag: "",
+            no_local:     false,
+            no_ack:       false,
+            exclusive:    false,
+            nowait:       false,
+            callback:     function (AMQPMessage $message) use ($callback, &$channel) {
+                try {
+                    $callback($message, $channel);
+                } catch (Throwable $e) {
+                    logger()->error("Erro ao processar mensagem de analysis_response.", [
+                        'err'  => $e->getMessage(),
+                        'body' => $message->getBody(),
+                    ]);
+                }
+            },
         );
 
         while ($channel->is_consuming()) {

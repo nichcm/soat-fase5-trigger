@@ -26,5 +26,11 @@ fi
 echo "Preparando banco de dados..."
 composer run post-create-project-cmd
 
+echo "Configurando filas no RabbitMQ..."
+php artisan queue:setup || {
+    echo "Falha na configuracao do RabbitMQ. O servico esta acessivel e configurado?"
+    exit 1
+}
+
 echo "🚀 Iniciando o container"
 exec php-fpm
