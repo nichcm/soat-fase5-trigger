@@ -1,6 +1,6 @@
 <?php
 
-use App\Infrastructure\Http\UploadHttpController;
+use App\Infrastructure\Http\TriggerHttpController;
 use Illuminate\Support\Facades\Route;
 
 Route::get("ping", function () {
@@ -11,7 +11,8 @@ Route::get("ping", function () {
     ]);
 });
 
-Route::post("upload", [UploadHttpController::class, 'upload']);
+// Route::get("data", [TriggerHttpController::class, 'getData']);
+// Route::get("status", [TriggerHttpController::class, 'getStatus']);
 
 Route::fallback(
     fn() => response()->json([
