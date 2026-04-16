@@ -11,6 +11,7 @@ class TriggerModel extends Model
     protected $fillable = [
         'protocol_uuid',
         'payload',
+        'created_at',
     ];
 
     protected $casts = [
