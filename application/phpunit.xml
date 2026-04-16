@@ -21,13 +21,13 @@
     </testsuites>
     <source>
         <include>
-            <directory>app</directory>
+            <directory>App</directory>
         </include>
         <exclude>
-            <directory>app/Infrastructure/Console</directory>
-            <directory>app/Infrastructure/Queue</directory>
-            <directory>app/Infrastructure/Gateway</directory>
-            <directory>app/Http/Middleware</directory>
+            <directory>App/Infrastructure/Console</directory>
+            <directory>App/Infrastructure/Queue</directory>
+            <directory>App/Infrastructure/Gateway</directory>
+            <directory>App/Http/Middleware</directory>
         </exclude>
     </source>
     <php>
