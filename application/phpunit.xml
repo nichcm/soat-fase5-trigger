@@ -24,14 +24,10 @@
             <directory>app</directory>
         </include>
         <exclude>
-            <directory>app/Console</directory>
-            <directory>app/Infrastructure/Service</directory>
-            <directory>app/Jobs</directory>
-            <directory>app/Signature</directory>
+            <directory>app/Infrastructure/Console</directory>
+            <directory>app/Infrastructure/Queue</directory>
+            <directory>app/Infrastructure/Gateway</directory>
             <directory>app/Http/Middleware</directory>
-            <file>app/Infrastructure/Gateway/RabbitMQGateway.php</file>
-            <file>app/Infrastructure/Repositories/ServicoMicrosservicoRepository.php</file>
-            <file>app/Infrastructure/Repositories/MaterialMicrosservicoRepository.php</file>
         </exclude>
     </source>
     <php>
