@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withCommands([
-        __DIR__ . "/../App/Infrastructure/Console/Commands/",
+        \App\Infrastructure\Console\Commands\QueueSetupCommand::class,
+        \App\Infrastructure\Console\Commands\ConsumeProtocolsCommand::class,
     ])
     ->create();
