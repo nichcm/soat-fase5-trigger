@@ -11,8 +11,8 @@ Route::get("ping", function () {
     ]);
 });
 
-// Route::get("data", [TriggerHttpController::class, 'getData']);
-// Route::get("status", [TriggerHttpController::class, 'getStatus']);
+Route::get("status/{protocol_uuid}", [TriggerHttpController::class, 'getStatus']);
+Route::get("data/{protocol_uuid}", [TriggerHttpController::class, 'getData']);
 
 Route::fallback(
     fn() => response()->json([

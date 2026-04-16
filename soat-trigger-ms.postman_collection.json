@@ -1,0 +1,71 @@
+{
+	"info": {
+		"name": "soat-trigger-ms",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8002/api",
+			"type": "string"
+		},
+		{
+			"key": "protocol_uuid",
+			"value": "SEU-PROTOCOL-UUID-AQUI",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"url": {
+					"raw": "{{base_url}}/ping",
+					"host": ["{{base_url}}"],
+					"path": ["ping"]
+				},
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				]
+			}
+		},
+		{
+			"name": "GET Status do Protocolo",
+			"request": {
+				"method": "GET",
+				"url": {
+					"raw": "{{base_url}}/status/{{protocol_uuid}}",
+					"host": ["{{base_url}}"],
+					"path": ["status", "{{protocol_uuid}}"]
+				},
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				]
+			}
+		},
+		{
+			"name": "GET Dados da Análise",
+			"request": {
+				"method": "GET",
+				"url": {
+					"raw": "{{base_url}}/data/{{protocol_uuid}}",
+					"host": ["{{base_url}}"],
+					"path": ["data", "{{protocol_uuid}}"]
+				},
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				]
+			}
+		}
+	]
+}
