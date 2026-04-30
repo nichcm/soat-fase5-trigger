@@ -3,7 +3,7 @@ services:
         image: nginx
         container_name: soat-trigger-nginx
         ports:
-            - 8002:80
+            - 8003:80
         hostname: soat-trigger-nginx-hostname
         restart: on-failure:3
         volumes:

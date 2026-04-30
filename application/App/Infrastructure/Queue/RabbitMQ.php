@@ -79,7 +79,11 @@ class RabbitMQ
 
         $channel->queue_declare(
             "protocols_queue",
-            false, true, false, false, false,
+            false,
+            true,
+            false,
+            false,
+            false,
             new AMQPTable([
                 "x-dead-letter-exchange"    => "protocols_dlx_exchange",
                 "x-dead-letter-routing-key" => "protocols_dlq_routing_key",
@@ -98,7 +102,11 @@ class RabbitMQ
 
         $channel->queue_declare(
             "analysis_response_queue",
-            false, true, false, false, false,
+            false,
+            true,
+            false,
+            false,
+            false,
             new AMQPTable([
                 "x-dead-letter-exchange"    => "analysis_response_dlx_exchange",
                 "x-dead-letter-routing-key" => "analysis_response_dlq_routing_key",
@@ -121,13 +129,13 @@ class RabbitMQ
         $channel = $this->createChannel();
 
         $channel->basic_consume(
-            queue:        "protocols_queue",
+            queue: "uploads_queue",
             consumer_tag: "",
-            no_local:     false,
-            no_ack:       false,
-            exclusive:    false,
-            nowait:       false,
-            callback:     function (AMQPMessage $message) use ($callback, &$channel) {
+            no_local: false,
+            no_ack: false,
+            exclusive: false,
+            nowait: false,
+            callback: function (AMQPMessage $message) use ($callback, &$channel) {
                 try {
                     $callback($message, $channel);
                 } catch (Throwable $e) {
@@ -149,13 +157,13 @@ class RabbitMQ
         $channel = $this->createChannel();
 
         $channel->basic_consume(
-            queue:        "analysis_response_queue",
+            queue: "analysis_response_queue",
             consumer_tag: "",
-            no_local:     false,
-            no_ack:       false,
-            exclusive:    false,
-            nowait:       false,
-            callback:     function (AMQPMessage $message) use ($callback, &$channel) {
+            no_local: false,
+            no_ack: false,
+            exclusive: false,
+            nowait: false,
+            callback: function (AMQPMessage $message) use ($callback, &$channel) {
                 try {
                     $callback($message, $channel);
                 } catch (Throwable $e) {
