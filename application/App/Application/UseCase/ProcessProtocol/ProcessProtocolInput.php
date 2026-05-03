@@ -17,13 +17,13 @@ class ProcessProtocolInput
     public static function fromArray(array $data): self
     {
         return new self(
-            protocol:     $data['protocol'],
-            fileUrl:      $data['file_url'],
-            fileName:     $data['file_name'],
-            fileMimetype: $data['file_mimetype'],
-            fileSize:     $data['file_size'],
-            originalName: $data['original_name'],
-            hashedName:   $data['hashed_name'],
+            protocol: $data['protocol'],
+            fileUrl: $data['storage_endpoint'],
+            fileName: $data['file_unique_name'],
+            fileMimetype: $data['file_mime_type'],
+            fileSize: $data['file_size'],
+            originalName: $data['file_original_name'],
+            hashedName: $data['file_unique_name'],
         );
     }
 }
