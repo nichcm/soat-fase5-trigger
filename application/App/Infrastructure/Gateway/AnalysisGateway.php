@@ -3,6 +3,7 @@
 namespace App\Infrastructure\Gateway;
 
 use App\Domain\Interface\AnalysisGatewayInterface;
+use App\Infrastructure\Observability\OtelContext;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -17,7 +18,7 @@ class AnalysisGateway implements AnalysisGatewayInterface
 
     public function sendForAnalysis(string $protocolUuid, string $fileUrl, string $fileMimetype): void
     {
-        $response = Http::post("{$this->baseUrl}/analyze", [
+        $response = Http::withHeaders(OtelContext::propagationHeaders())->post("{$this->baseUrl}/analyze", [
             'protocol' => $protocolUuid,
             'file'     => [
                 'url'      => $fileUrl,
