@@ -6,14 +6,15 @@ class ProcessAnalysisResponseInput
 {
     public function __construct(
         public readonly string $protocol,
-        public readonly array  $components,
-        public readonly array  $risks,
-        public readonly array  $recommendations,
+        public readonly array|null  $components,
+        public readonly array|null  $risks,
+        public readonly array|null  $recommendations,
     ) {}
 
     public static function fromArray(array $data): self
     {
-        return new self(
+
+         return new self(
             protocol:        $data['protocol'],
             components:      $data['components']      ?? [],
             risks:           $data['risks']           ?? [],

@@ -2,6 +2,7 @@
 
 namespace App\Infrastructure\Queue;
 
+use App\Infrastructure\Observability\OtelContext;
 use Exception;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
@@ -74,34 +75,34 @@ class RabbitMQ
         $channel = $this->createChannel();
 
         // --- Fila de protocolos (publicada pelo upload-ms, consumida aqui) ---
-        $channel->exchange_declare("protocols_exchange",     "direct", false, true, false);
-        $channel->exchange_declare("protocols_dlx_exchange", "direct", false, true, false);
+        $channel->exchange_declare("uploads_exchange",     "direct", false, true, false);
+        $channel->exchange_declare("uploads_dlx_exchange", "direct", false, true, false);
 
         $channel->queue_declare(
-            "protocols_queue",
+            "uploads_queue",
             false,
             true,
             false,
             false,
             false,
             new AMQPTable([
-                "x-dead-letter-exchange"    => "protocols_dlx_exchange",
-                "x-dead-letter-routing-key" => "protocols_dlq_routing_key",
+                "x-dead-letter-exchange"    => "uploads_dlx_exchange",
+                "x-dead-letter-routing-key" => "uploads_dlq_routing_key",
                 "x-message-ttl"             => 5000,
             ]),
         );
 
-        $channel->queue_declare("protocols_dlq_queue", false, true, false, false);
+        $channel->queue_declare("uploads_dlq_queue", false, true, false, false);
 
-        $channel->queue_bind("protocols_queue",     "protocols_exchange",     "protocols_routing_key");
-        $channel->queue_bind("protocols_dlq_queue", "protocols_dlx_exchange", "protocols_dlq_routing_key");
+        $channel->queue_bind("uploads_queue",     "uploads_exchange",     "uploads_routing_key");
+        $channel->queue_bind("uploads_dlq_queue", "uploads_dlx_exchange", "uploads_dlq_routing_key");
 
         // --- Fila de respostas de análise (publicada pela IA, consumida aqui) ---
         $channel->exchange_declare("analysis_response_exchange",     "direct", false, true, false);
         $channel->exchange_declare("analysis_response_dlx_exchange", "direct", false, true, false);
 
         $channel->queue_declare(
-            "analysis_response_queue",
+            "analysis_response",
             false,
             true,
             false,
@@ -116,7 +117,7 @@ class RabbitMQ
 
         $channel->queue_declare("analysis_response_dlq_queue", false, true, false, false);
 
-        $channel->queue_bind("analysis_response_queue",     "analysis_response_exchange",     "analysis_response_routing_key");
+        $channel->queue_bind("analysis_response",     "analysis_response_exchange",     "analysis_response_routing_key");
         $channel->queue_bind("analysis_response_dlq_queue", "analysis_response_dlx_exchange", "analysis_response_dlq_routing_key");
 
         $channel->close();
@@ -136,13 +137,16 @@ class RabbitMQ
             exclusive: false,
             nowait: false,
             callback: function (AMQPMessage $message) use ($callback, &$channel) {
+                $this->applyMessageContext($message);
                 try {
                     $callback($message, $channel);
                 } catch (Throwable $e) {
-                    logger()->error("Erro ao processar mensagem de protocols.", [
+                    logger()->error("Erro ao processar mensagem de upload.", [
                         'err'  => $e->getMessage(),
                         'body' => $message->getBody(),
                     ]);
+                } finally {
+                    OtelContext::clear();
                 }
             },
         );
@@ -157,13 +161,14 @@ class RabbitMQ
         $channel = $this->createChannel();
 
         $channel->basic_consume(
-            queue: "analysis_response_queue",
+            queue: "analysis_response",
             consumer_tag: "",
             no_local: false,
             no_ack: false,
             exclusive: false,
             nowait: false,
             callback: function (AMQPMessage $message) use ($callback, &$channel) {
+                $this->applyMessageContext($message);
                 try {
                     $callback($message, $channel);
                 } catch (Throwable $e) {
@@ -171,6 +176,8 @@ class RabbitMQ
                         'err'  => $e->getMessage(),
                         'body' => $message->getBody(),
                     ]);
+                } finally {
+                    OtelContext::clear();
                 }
             },
         );
@@ -178,5 +185,34 @@ class RabbitMQ
         while ($channel->is_consuming()) {
             $channel->wait();
         }
+    }
+
+    private function applyMessageContext(AMQPMessage $message): void
+    {
+        $headers = $this->messageHeaders($message);
+        $traceparent = $headers['traceparent'] ?? $headers['Traceparent'] ?? null;
+        $incomingContext = OtelContext::parseTraceparent(is_string($traceparent) ? $traceparent : null);
+
+        $traceId = $incomingContext['traceId'] ?? bin2hex(random_bytes(16));
+        $spanId = bin2hex(random_bytes(8));
+        $parentSpanId = $incomingContext['parentSpanId'] ?? null;
+        $correlationId = $headers['X-Correlation-ID'] ?? $headers['x-correlation-id'] ?? $headers['X-Request-ID'] ?? $traceId;
+
+        OtelContext::set($traceId, $spanId, $parentSpanId, is_string($correlationId) ? $correlationId : $traceId);
+    }
+
+    private function messageHeaders(AMQPMessage $message): array
+    {
+        try {
+            $applicationHeaders = $message->get('application_headers');
+        } catch (Throwable) {
+            return [];
+        }
+
+        if ($applicationHeaders instanceof AMQPTable) {
+            return $applicationHeaders->getNativeData();
+        }
+
+        return is_array($applicationHeaders) ? $applicationHeaders : [];
     }
 }

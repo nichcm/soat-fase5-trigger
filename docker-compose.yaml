@@ -20,6 +20,15 @@ services:
         build:
             context: .
             dockerfile: ./docker/images/php/Dockerfile
+        environment:
+            OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+            OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+            OTEL_SERVICE_NAME: soat-trigger
+            OTEL_RESOURCE_ATTRIBUTES: deployment.environment=local,service.namespace=soat
+            OTEL_TRACES_EXPORTER: otlp
+            OTEL_METRICS_EXPORTER: otlp
+            OTEL_LOGS_EXPORTER: otlp
+            LOG_STACK: single,otel
         volumes:
             - ./application:/var/www/html
         restart: on-failure:3
@@ -33,8 +42,63 @@ services:
                 ]
             interval: 5s
             timeout: 3s
+            start_period: 300s
             retries: 3
         depends_on:
+            trigger_pg:
+                condition: service_healthy
+                restart: true
+
+    trigger_protocols_worker:
+        container_name: soat-trigger-protocols-worker
+        hostname: soat-trigger-protocols-worker-hostname
+        build:
+            context: .
+            dockerfile: ./docker/images/php/Dockerfile
+        command: ["php", "artisan", "consume:protocols"]
+        environment:
+            OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+            OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+            OTEL_SERVICE_NAME: soat-trigger-protocols-worker
+            OTEL_RESOURCE_ATTRIBUTES: deployment.environment=local,service.namespace=soat
+            OTEL_TRACES_EXPORTER: otlp
+            OTEL_METRICS_EXPORTER: otlp
+            OTEL_LOGS_EXPORTER: otlp
+            LOG_STACK: single,otel
+        volumes:
+            - ./application:/var/www/html
+        restart: on-failure:3
+        depends_on:
+            trigger:
+                condition: service_healthy
+                restart: true
+            trigger_pg:
+                condition: service_healthy
+                restart: true
+
+    trigger_analysis_response_worker:
+        container_name: soat-trigger-analysis-response-worker
+        hostname: soat-trigger-analysis-response-worker-hostname
+        build:
+            context: .
+            dockerfile: ./docker/images/php/Dockerfile
+        command: ["php", "artisan", "consume:analysis-response"]
+        environment:
+            OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+            OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+            OTEL_SERVICE_NAME: soat-trigger-analysis-response-worker
+            OTEL_RESOURCE_ATTRIBUTES: deployment.environment=local,service.namespace=soat
+            OTEL_TRACES_EXPORTER: otlp
+            OTEL_METRICS_EXPORTER: otlp
+            OTEL_LOGS_EXPORTER: otlp
+            LOG_STACK: single,otel
+        volumes:
+            - ./application:/var/www/html
+        restart: on-failure:3
+        depends_on:
+            trigger:
+                condition: service_healthy
+                restart: true
             trigger_pg:
                 condition: service_healthy
                 restart: true

@@ -2,24 +2,28 @@
 
 set -e
 
-echo "🚫 Ajustando permissões"
+echo "Ajustando permissoes"
 chown -R www-data:www-data /var/www/html/storage \
     && chmod -R 775 /var/www/html/storage
 
 chown -R www-data:www-data storage bootstrap/cache
 chmod -R 775 storage bootstrap/cache
 
-echo "📦 Instalando dependências"
-mkdir -p vendor
-composer install --no-dev --optimize-autoloader || {
-    echo "❌ Falha na instalação das dependências"
-    exit 1
-}
+echo "Instalando dependencias"
+if [ ! -f vendor/autoload.php ]; then
+    mkdir -p vendor
+    composer config --global process-timeout 0
+    COMPOSER_PROCESS_TIMEOUT=1200 COMPOSER_MEMORY_LIMIT=-1 composer install --no-dev --optimize-autoloader || {
+        echo "Falha na instalacao das dependencias"
+        exit 1
+    }
+else
+    echo "Dependencias ja instaladas"
+fi
 
 if [ ! -f .env ]; then
     cp .env.example .env
-
-    echo "🔑 Gerando chave da aplicação"
+    echo "Gerando chave da aplicacao"
     composer run gen-app-key
 fi
 
@@ -32,5 +36,9 @@ php artisan queue:setup || {
     exit 1
 }
 
-echo "🚀 Iniciando o container"
-exec php-fpm
+if [ "$#" -eq 0 ]; then
+    set -- php-fpm
+fi
+
+echo "Iniciando comando: $*"
+exec "$@"
