@@ -19,16 +19,23 @@ class ConsumeAnalysisResponseCommand extends Command
         $this->info('Aguardando mensagens na fila analysis_response...');
 
         $rabbitMQ->consumeAnalysisResponse(function (AMQPMessage $message) use ($useCase) {
-            $payload = json_decode($message->getBody(), true);
+            $raw = $message->getBody();
+
+            // Converte repr Python → JSON válido
+            $json = preg_replace("/'([^']*)'/", '"$1"', $raw);
+            $json = str_replace(['True', 'False', 'None'], ['true', 'false', 'null'], $json);
+
+            $payload = json_decode($json, true);
 
             $this->info("Processando resposta de análise para o protocolo: {$payload['protocol']}");
 
             try {
-                $useCase->execute(ProcessAnalysisResponseInput::fromArray($payload));
+               
+                $useCase->execute(ProcessAnalysisResponseInput::fromArray( $payload));
                 $message->ack();
-                $this->info("Análise do protocolo {$payload['protocol']} salva com sucesso.");
+                $this->info("Análise do protocolo salva com sucesso.");
             } catch (Throwable $e) {
-                $this->error("Erro ao processar análise do protocolo {$payload['protocol']}: {$e->getMessage()}");
+                $this->error("Erro ao processar análise do protocolo: {$e->getMessage()}");
                 $message->nack(requeue: false);
             }
         });

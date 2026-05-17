@@ -16,21 +16,26 @@ class ProcessAnalysisResponseUseCase
 
     public function execute(ProcessAnalysisResponseInput $input): void
     {
-        $trigger = $this->repository->findTriggerByProtocolUuid($input->protocol);
+       try {
+            $trigger = $this->repository->findTriggerByProtocolUuid($input->protocol);
 
-        if (!$trigger) {
-            throw new DomainHttpException(
-                "Trigger não encontrado para o protocolo: {$input->protocol}",
-                Response::HTTP_NOT_FOUND,
-            );
-        }
+            if (!$trigger) {
+                throw new DomainHttpException(
+                    "Trigger não encontrado para o protocolo: {$input->protocol}",
+                    Response::HTTP_NOT_FOUND,
+                );
+            }
 
-        $this->repository->saveAnalysisResponse(new AnalysisResponse(
-            id:         null,
-            protocolId: $trigger->id,
-            status:     AnalysisResponse::STATUS_SUCESSO,
-            content:    $input->toContent(),
-            receivedAt: new DateTimeImmutable(),
-        ));
+            $this->repository->saveAnalysisResponse(new AnalysisResponse(
+                id:         null,
+                protocolId: $trigger->id,
+                status:     AnalysisResponse::STATUS_SUCESSO,
+                content:    $input->toContent(),
+                receivedAt: new DateTimeImmutable(),
+            ));
+       } catch (\Throwable $th) {
+            $this->error("Erro ao processar execute -> {$th->getMessage()}");
+             throw $th;
+       }
     }
 }
